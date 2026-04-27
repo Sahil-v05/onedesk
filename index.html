@@ -443,7 +443,9 @@ function renderFiles(files) {
 
   files.sort((a, b) => b.time - a.time);
 
-  fileList.innerHTML = files.map(f => `
+  fileList.innerHTML = files.map(f => {
+    const encodedName = encodeURIComponent(f.name);
+    return `
     <div class="file-item" id="file-${CSS.escape(f.name)}">
       <div class="file-icon">${fileIcon(f.name)}</div>
       <div class="file-info">
@@ -451,11 +453,12 @@ function renderFiles(files) {
         <div class="file-meta">${formatSize(f.size)} · ${formatTime(f.time)}</div>
       </div>
       <div class="file-actions">
-        <button class="btn-icon" title="Download" onclick="downloadFile('${encodeURIComponent(f.name)}')">↓</button>
-        <button class="btn-icon danger" title="Delete" onclick="deleteFile('${encodeURIComponent(f.name)}')">✕</button>
+        <button class="btn-icon" title="Download" data-name="${encodedName}" onclick="downloadFile(this.dataset.name)">↓</button>
+        <button class="btn-icon danger" title="Delete" data-name="${encodedName}" onclick="deleteFile(this.dataset.name)">✕</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function saveText() {
@@ -475,8 +478,15 @@ async function saveText() {
 async function copyText() {
   const text = textInput.value;
   if (!text) { showToast('Nothing to copy'); return; }
-  await navigator.clipboard.writeText(text);
-  showToast('✓ Copied to clipboard');
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('✓ Copied to clipboard');
+  } catch (err) {
+    // Fallback for older browsers or insecure contexts
+    textInput.select();
+    document.execCommand('copy');
+    showToast('✓ Copied to clipboard');
+  }
 }
 
 async function clearText() {
@@ -535,9 +545,14 @@ function downloadFile(encodedName) {
 }
 
 async function deleteFile(encodedName) {
-  await fetch(API + '/api/file/' + encodedName, { method: 'DELETE' });
-  showToast('File removed');
-  fetchState();
+  const res = await fetch(API + '/api/file/' + encodedName, { method: 'DELETE' });
+  if (res.ok) {
+    showToast('File removed');
+    fetchState();
+  } else {
+    const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+    showToast('Error: ' + err.error, 3000);
+  }
 }
 
 // Drag & drop

@@ -241,7 +241,16 @@ const server = http.createServer((req, res) => {
   if (req.method === 'DELETE' && url.pathname.startsWith('/api/file/')) {
     const name = decodeURIComponent(url.pathname.replace('/api/file/', ''));
     const fp   = path.join(UPLOAD_DIR, path.basename(name));
-    try { if (fs.existsSync(fp)) fs.unlinkSync(fp); } catch {}
+    try { 
+      if (fs.existsSync(fp)) {
+        fs.unlinkSync(fp); 
+      }
+    } catch (e) {
+      console.error('Delete error:', e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+      return;
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
     return;
